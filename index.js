@@ -13,14 +13,6 @@ function getBase64 (img, callback) {
   reader.readAsDataURL(img)
 }
 
-function beforeUpload (file) {
-  const isLt2M = file.size / 1024 / 1024 < 2
-  if (!isLt2M) {
-    message.error('图片不能大于2MB!')
-  }
-  return isLt2M
-}
-
 class App extends React.Component {
 	constructor (props) {
     super(props)
@@ -30,6 +22,7 @@ class App extends React.Component {
       imageUrl: props.file,
       naturalWidth: '',
       naturalHeight: '',
+	  error:false,
     }
   }
   _crop = () => {
@@ -41,19 +34,30 @@ class App extends React.Component {
       })
     }
   }
+  beforeUpload (file) {
+	  const isLt2M = file.size / 1024 / 1024 < 2
+	  if (!isLt2M) {
+		message.error('图片不能大于2MB!请重新选择')
+		this.setState({error: true })
+	  }else{
+		 this.setState({error: false })
+	  }
+	  
+	  return isLt2M
+  }
   render () {
-    const { visible, imageUrl, naturalHeight, naturalWidth } = this.state
+    const { visible, imageUrl, naturalHeight, naturalWidth, error } = this.state
     const { tRatio, onUpload } = this.props
 
 
     const uploadProps = {
       accept: 'image/jpg,image/jpeg,image/png,image/bmp',
-      action: '',
+      action: '/',
       showUploadList: false,
-      beforeUpload: (info) => { beforeUpload(info) },
+      beforeUpload: (info) => { this.beforeUpload(info) },
       customRequest: (info) => {
-        getBase64(info.file, imageUrl => this.setState({ imageUrl }))
-        this.setState({ visible: true })
+        getBase64(info.file, imageUrl => this.setState({ imageUrl:error?'':imageUrl }))
+        this.setState({ visible: error?false:true })
       },
       onChange: (info) => {
         console.log('test')
@@ -69,15 +73,17 @@ class App extends React.Component {
         })
 
         let params = new URLSearchParams()
-        params.append('imgStr', this.refs.cropper.getCroppedCanvas().toDataURL())
-        axios.post(uploadProps.action, params).then((res) => {
-          if (res.data.result) {
-            message.success('图片上传成功')
-            onUpload(res.data.data)
-          } else {
-            message.error('图片上传失败')
-          }
-        })
+		if(this.state.imageUrl){
+			params.append('imgStr', this.state.imageUrl)
+			axios.post(uploadProps.action, params).then((res) => {
+			  if (res.data.result) {
+				message.success('图片上传成功')
+				onUpload(res.data.data)
+			  } else {
+				message.error('图片上传失败')
+			  }
+			})
+		}
       },
       onCancel: () => {
         this.setState({
